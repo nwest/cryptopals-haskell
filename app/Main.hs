@@ -1,6 +1,8 @@
+{-# LANGUAGE OverloadedStrings #-}
+
 module Main where
 
-import Lib
+import Set1
 
 main :: IO ()
-main = someFunc
+main = print ""

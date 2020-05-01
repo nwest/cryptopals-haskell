@@ -22,7 +22,17 @@ description:         Please see the README on GitHub at <https://github.com/nwes
 dependencies:
 - base >= 4.7 && < 5
 
+ghc-options: -Wall
+
+default-extensions: OverloadedStrings
+
 library:
+  dependencies:
+  - base
+  - containers
+  - bytestring
+  - base64-bytestring
+  - base16-bytestring
   source-dirs: src
 
 executables:
@@ -34,11 +44,8 @@ executables:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
+    - base
     - cryptopals
-    - containers
-    - bytestring
-    - base64-bytestring
-    - base16-bytestring
 
 tests:
   cryptopals-test:
@@ -49,4 +56,8 @@ tests:
     - -rtsopts
     - -with-rtsopts=-N
     dependencies:
+    - base
     - cryptopals
+    - tasty
+    - tasty-hspec
+    - bytestring
