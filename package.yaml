@@ -35,6 +35,10 @@ executables:
     - -with-rtsopts=-N
     dependencies:
     - cryptopals
+    - containers
+    - bytestring
+    - base64-bytestring
+    - base16-bytestring
 
 tests:
   cryptopals-test:
