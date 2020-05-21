@@ -51,7 +51,7 @@ singleCharXOR c xs = BS.pack . BS.zipWith xor cs $ xs
                         cs = BS.pack . replicate len $ c
 
 singleChars :: [Word8]
-singleChars = map c2w ['A'..'z'] -- "ABCDEFGHIJKLMNOPQRSTUVWXYZ[\\]^_`abcdefghijklmnopqrstuvwxyz"
+singleChars = [50..120]
 
 charEnglishScore :: Word8 -> Int
 charEnglishScore c | f 'e' = 200
@@ -79,7 +79,28 @@ num3 = let (_, _, x) = bestSingleCharXOR input3
 bestSingleCharXOR :: BS.ByteString -> (Word8, Int, BS.ByteString)
 bestSingleCharXOR xs = let scores = map f singleChars
                         in last . sortOn (\(_, a, _) -> a) $ scores
-                       where f c = let xord = singleCharXOR c input3
+                       where f c = let xord = singleCharXOR c xs
                                        score = englishScore xord
                                     in (c, score, xord)
 
+readByteList :: [String] -> [BS.ByteString]
+readByteList = map (hexToBytes . HexString . BS.pack . map c2w)
+
+bslines :: BS.ByteString -> [BS.ByteString]
+bslines = BS.split (c2w '\n')
+
+num4 :: IO BS.ByteString
+num4 = do
+       input <- map (bestSingleCharXOR . hexToBytes . HexString) . bslines <$> BS.readFile "./4.txt"
+       let (_, _, st) = last . sortOn (\(_, x, _ ) -> x) $ input
+       return st
+
+bsrepeat :: BS.ByteString -> BS.ByteString
+bsrepeat bs = BS.append bs (bsrepeat bs)
+
+repeatKeyXOR :: BS.ByteString -> BS.ByteString -> BS.ByteString
+repeatKeyXOR k bs = let key = BS.take (BS.length bs) (bsrepeat k)
+                        xord = xorBytes key bs
+                     in case xord of
+                          Right a -> a
+                          Left b -> runError b
