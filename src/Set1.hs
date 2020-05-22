@@ -7,7 +7,7 @@ import qualified Data.ByteString.Lazy        as BS
 import qualified Data.ByteString.Base16.Lazy as BS16
 import qualified Data.ByteString.Base64.Lazy as BS64
 import Data.ByteString.Internal (c2w, w2c)
-import Data.Bits (xor)
+import Data.Bits (xor, popCount)
 import Data.List (foldl', sortOn)
 
 newtype ErrorString a = ErrorString {runError :: a} deriving (Show, Eq)
@@ -104,3 +104,9 @@ repeatKeyXOR k bs = let key = BS.take (BS.length bs) (bsrepeat k)
                      in case xord of
                           Right a -> a
                           Left b -> runError b
+
+editDistance :: BS.ByteString -> BS.ByteString -> Int
+editDistance a b = sum . zipWith edit (BS.unpack a) $ (BS.unpack b)
+                   where
+                     edit x0 x1 = popCount $ xor x0 x1
+
