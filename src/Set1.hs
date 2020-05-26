@@ -51,17 +51,24 @@ singleCharXOR c xs = BS.pack . BS.zipWith xor cs $ xs
                         cs = BS.pack . replicate len $ c
 
 singleChars :: [Word8]
-singleChars = [50..120]
+singleChars = [33..122] ++ [c2w ' ']
+
+singleCharsNice :: String
+singleCharsNice = map w2c singleChars
 
 charEnglishScore :: Word8 -> Int
-charEnglishScore c | f 'e' = 200
-                   | f 't' = 180
-                   | f 'a' = 160
-                   | f 'o' = 140
-                   | f 'l' = 120
-                   | f 'i' = 100
-                   | f 'n' = 80
-                   | otherwise = -2
+charEnglishScore c | f 'e' = 2200
+                   | f 't' = 2000
+                   | f 'a' = 1800
+                   | f 'o' = 1200
+                   | f 'i' = 1000
+                   | f 'n' = 800
+                   | f 's' = 800
+                   | f 'h' = 800
+                   | f 'r' = 800
+                   | f 'd' = 800
+                   | f 'u' = 800
+                   | otherwise = -3000
                   where
                     f x = c == c2w x
 
@@ -106,7 +113,41 @@ repeatKeyXOR k bs = let key = BS.take (BS.length bs) (bsrepeat k)
                           Left b -> runError b
 
 editDistance :: BS.ByteString -> BS.ByteString -> Int
-editDistance a b = sum . zipWith edit (BS.unpack a) $ (BS.unpack b)
+editDistance a b = sum . zipWith edit (BS.unpack a) $ BS.unpack b
                    where
                      edit x0 x1 = popCount $ xor x0 x1
 
+takeChunks :: Int -> BS.ByteString -> [BS.ByteString]
+takeChunks len = BS.foldl f []
+  where
+    f b a | null b = [BS.singleton a]
+          | BS.length (last b) == fromIntegral len = b ++ [BS.singleton a]
+          | otherwise = init b ++ [BS.append (last b) (BS.singleton a)]
+
+keySize :: BS.ByteString -> Int
+keySize bs = let possible = map (take 10 . (`takeChunks` bs)) [2..40]
+             in editScores possible
+
+editScores :: [[BS.ByteString]] -> Int
+editScores = fst . head . sortOn snd . map editScore
+
+editScore :: [BS.ByteString] -> (Int, Float)
+editScore [] = (0, 0)
+editScore bs@(b:_) = let len = length bs
+                         keyLength = fromIntegral . BS.length $ b
+                         scores = zipWith editDistance bs (drop 1 bs)
+                         avgScoreNormal = (fromIntegral (sum scores) / fromIntegral len) / fromIntegral keyLength
+                      in (keyLength, avgScoreNormal)
+
+num6 :: IO BS.ByteString
+num6 = do
+       input <- BS64.decode . BS.concat . BS.split (c2w '\n') <$> BS.readFile "./6.txt"
+       let bs = case input of
+                  Right bs' -> bs'
+                  Left s -> BS.pack . map c2w $ s
+           keyLen = keySize bs
+           decrypted = BS.concat . BS.transpose . map (trd . bestSingleCharXOR) . BS.transpose $ takeChunks keyLen bs
+       return decrypted
+
+trd :: (a, b, c) -> c
+trd (_, _, c) = c
