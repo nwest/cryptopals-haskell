@@ -10,6 +10,7 @@ import qualified Data.ByteString.Base64.Lazy as BS64
 import Data.ByteString.Internal (c2w, w2c)
 import Data.Bits (xor, popCount)
 import Data.List (foldl', sortOn)
+import qualified Data.Set as S
 import OpenSSL.EVP.Cipher
 import OpenSSL.EVP.Base64
 
@@ -144,7 +145,7 @@ editScore bs@(b:_) = let len = length bs
 
 num6 :: IO BS.ByteString
 num6 = do
-       input <- BS64.decode . BS.concat . BS.split (c2w '\n') <$> BS.readFile "./6.txt"
+       input <- BS64.decode . BS.filter (/= (c2w '\n')) <$> BS.readFile "./6.txt"
        let bs = case input of
                   Right bs' -> bs'
                   Left s -> BS.pack . map c2w $ s
@@ -160,8 +161,15 @@ ciphers = getCipherNames
 
 num7 :: IO B.ByteString
 num7 = do cip       <- getCipherByName $ "aes-128-ecb"
-          encrypted <- decodeBase64BS . B.concat . B.split (c2w '\n') <$> B.readFile "./7.txt"
+          encrypted <- decodeBase64BS . B.filter (/= (c2w '\n')) <$> B.readFile "./7.txt"
           let key = B.pack . map c2w $ "YELLOW SUBMARINE"
           case cip of
               Just c -> (cipherBS c key B.empty Decrypt encrypted)
               Nothing ->  return B.empty
+
+num8 :: IO (S.Set BS.ByteString)
+num8 = do 
+        possible <- init . map (takeChunks 16 . hexToBytes . HexString) . BS.split (c2w '\n') <$> BS.readFile "./8.txt"
+        let sets = map S.fromList possible
+            smallest = head . sortOn S.size $ sets
+        return smallest
