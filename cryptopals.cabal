@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 6a1a76f0762243b30b5b3eb182ac5f1f000b863066257afcd69aca1e661236d5
+-- hash: 31ff120d281b67412c6525758e91532a32e200b5c15216d831a5f1e638914939
 
 name:           cryptopals
 version:        0.1.0.0
@@ -36,7 +36,8 @@ library
   default-extensions: OverloadedStrings
   ghc-options: -Wall
   build-depends:
-      base
+      HsOpenSSL
+    , base
     , base16-bytestring
     , base64-bytestring
     , bytestring

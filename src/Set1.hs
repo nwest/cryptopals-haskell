@@ -4,11 +4,14 @@ module Set1 where
 
 import Data.Word (Word8)
 import qualified Data.ByteString.Lazy        as BS
+import qualified Data.ByteString             as B
 import qualified Data.ByteString.Base16.Lazy as BS16
 import qualified Data.ByteString.Base64.Lazy as BS64
 import Data.ByteString.Internal (c2w, w2c)
 import Data.Bits (xor, popCount)
 import Data.List (foldl', sortOn)
+import OpenSSL.EVP.Cipher
+import OpenSSL.EVP.Base64
 
 newtype ErrorString a = ErrorString {runError :: a} deriving (Show, Eq)
 newtype HexString a = HexString {runHex :: a} deriving (Show, Eq)
@@ -151,3 +154,14 @@ num6 = do
 
 trd :: (a, b, c) -> c
 trd (_, _, c) = c
+
+ciphers :: IO [String]
+ciphers = getCipherNames
+
+num7 :: IO B.ByteString
+num7 = do cip       <- getCipherByName $ "aes-128-ecb"
+          encrypted <- decodeBase64BS . B.concat . B.split (c2w '\n') <$> B.readFile "./7.txt"
+          let key = B.pack . map c2w $ "YELLOW SUBMARINE"
+          case cip of
+              Just c -> (cipherBS c key B.empty Decrypt encrypted)
+              Nothing ->  return B.empty
