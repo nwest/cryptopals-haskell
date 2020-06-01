@@ -9,21 +9,22 @@ import qualified Data.ByteString.Base16.Lazy as BS16
 import qualified Data.ByteString.Base64.Lazy as BS64
 import Data.ByteString.Internal (c2w, w2c)
 import Data.Bits (xor, popCount)
+import Data.Either (fromRight)
 import Data.List (foldl', sortOn)
 import qualified Data.Set as S
 import OpenSSL.EVP.Cipher
 import OpenSSL.EVP.Base64
 
 type ErrorString = BS.ByteString
-newtype HexString a = HexString {runHex :: a} deriving (Show, Eq)
+type HexString = BS.ByteString
 newtype Base64String a = Base64String {runBase64 :: a} deriving (Show, Eq)
 
-hexToBase64 :: HexString BS.ByteString -> Either (ErrorString) (Base64String BS.ByteString)
+hexToBase64 :: HexString -> Either (ErrorString) (Base64String BS.ByteString)
 hexToBase64 a = Base64String . BS64.encode <$> decodeHex a
 
-decodeHex :: HexString BS.ByteString -> Either (ErrorString) BS.ByteString
-decodeHex a | (decoded, "") <- BS16.decode . runHex $ a = Right decoded
-            | otherwise = Left $ BS.concat ["invalid hex: ", runHex a]
+decodeHex :: HexString -> Either (ErrorString) BS.ByteString
+decodeHex a | (decoded, "") <- BS16.decode $ a = Right decoded
+            | otherwise = Left $ BS.concat ["invalid hex: ", a]
 
 rawString :: BS.ByteString -> String
 rawString = map w2c . BS.unpack
@@ -32,21 +33,15 @@ xorBytes :: BS.ByteString -> BS.ByteString -> Either (ErrorString) BS.ByteString
 xorBytes a b | BS.length a == BS.length b = Right . BS.pack $ BS.zipWith xor a b
              | otherwise = Left "Mismatched lengths for XOR"
 
-bytesToHex :: BS.ByteString -> HexString BS.ByteString
-bytesToHex = HexString . BS16.encode
+bytesToHex :: BS.ByteString -> HexString
+bytesToHex = BS16.encode
 
 
-hexToRaw :: HexString BS.ByteString -> String
-hexToRaw hs = let bs = decodeHex hs
-               in case bs of
-                    Right a -> rawString a
-                    Left  b -> rawString b
+hexToRaw :: HexString -> String
+hexToRaw = rawString . fromRight "" <$> decodeHex
 
-hexToBytes :: HexString BS.ByteString -> BS.ByteString
-hexToBytes hs = let bs = decodeHex hs
-                 in case bs of
-                    Right a -> a
-                    Left  b -> b
+hexToBytes :: HexString -> BS.ByteString
+hexToBytes = fromRight BS.empty . decodeHex
 
 singleCharXOR :: Word8 -> BS.ByteString -> BS.ByteString
 singleCharXOR c xs = BS.pack . BS.zipWith xor cs $ xs
@@ -81,7 +76,7 @@ englishScore :: BS.ByteString -> Int
 englishScore = foldl' (+) 0 . map charEnglishScore . BS.unpack
 
 input3 :: BS.ByteString
-input3 = hexToBytes . HexString $ "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736"
+input3 = hexToBytes "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783a393b3736"
 
 num3 :: BS.ByteString
 num3 = let (_, _, x) = bestSingleCharXOR input3
@@ -95,14 +90,14 @@ bestSingleCharXOR xs = let scores = map f singleChars
                                     in (c, score, xord)
 
 readByteList :: [String] -> [BS.ByteString]
-readByteList = map (hexToBytes . HexString . BS.pack . map c2w)
+readByteList = map (hexToBytes . BS.pack . map c2w)
 
 bslines :: BS.ByteString -> [BS.ByteString]
 bslines = BS.split (c2w '\n')
 
 num4 :: IO BS.ByteString
 num4 = do
-       input <- map (bestSingleCharXOR . hexToBytes . HexString) . bslines <$> BS.readFile "./4.txt"
+       input <- map (bestSingleCharXOR . hexToBytes) . bslines <$> BS.readFile "./4.txt"
        let (_, _, st) = last . sortOn (\(_, x, _ ) -> x) $ input
        return st
 
@@ -169,7 +164,7 @@ num7 = do cip       <- getCipherByName $ "aes-128-ecb"
 
 num8 :: IO (S.Set BS.ByteString)
 num8 = do 
-        possible <- init . map (takeChunks 16 . hexToBytes . HexString) . BS.split (c2w '\n') <$> BS.readFile "./8.txt"
+        possible <- init . map (takeChunks 16 . hexToBytes) . BS.split (c2w '\n') <$> BS.readFile "./8.txt"
         let sets = map S.fromList possible
             smallest = head . sortOn S.size $ sets
         return smallest
