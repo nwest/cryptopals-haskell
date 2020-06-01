@@ -17,10 +17,10 @@ import OpenSSL.EVP.Base64
 
 type ErrorString = BS.ByteString
 type HexString = BS.ByteString
-newtype Base64String a = Base64String {runBase64 :: a} deriving (Show, Eq)
+type Base64String = BS.ByteString
 
-hexToBase64 :: HexString -> Either (ErrorString) (Base64String BS.ByteString)
-hexToBase64 a = Base64String . BS64.encode <$> decodeHex a
+hexToBase64 :: HexString -> Either (ErrorString) (Base64String)
+hexToBase64 a = BS64.encode <$> decodeHex a
 
 decodeHex :: HexString -> Either (ErrorString) BS.ByteString
 decodeHex a | (decoded, "") <- BS16.decode $ a = Right decoded
