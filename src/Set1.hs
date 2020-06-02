@@ -82,13 +82,6 @@ editDistance a b = sum . zipWith edit (BS.unpack a) $ BS.unpack b
                    where
                      edit x0 x1 = popCount $ xor x0 x1
 
-takeChunks :: Int -> BS.ByteString -> [BS.ByteString]
-takeChunks len = BS.foldl f []
-  where
-    f b a | null b = [BS.singleton a]
-          | BS.length (last b) == fromIntegral len = b ++ [BS.singleton a]
-          | otherwise = init b ++ [BS.append (last b) (BS.singleton a)]
-
 keySize :: BS.ByteString -> Int
 keySize bs = let possible = map (take 10 . (`takeChunks` bs)) [2..40]
              in editScores possible
@@ -113,9 +106,6 @@ num6 = do
            keyLen = keySize bs
            decrypted = BS.concat . BS.transpose . map (trd . bestSingleCharXOR) . BS.transpose $ takeChunks keyLen bs
        return decrypted
-
-trd :: (a, b, c) -> c
-trd (_, _, c) = c
 
 ciphers :: IO [String]
 ciphers = getCipherNames

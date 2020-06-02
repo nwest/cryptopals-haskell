@@ -43,3 +43,13 @@ singleCharXOR c xs = BS.pack . BS.zipWith xor cs $ xs
                       where
                         len = fromIntegral . BS.length $ xs
                         cs = BS.pack . replicate len $ c
+
+takeChunks :: Int -> BS.ByteString -> [BS.ByteString]
+takeChunks len = BS.foldl f []
+  where
+    f b a | null b = [BS.singleton a]
+          | BS.length (last b) == fromIntegral len = b ++ [BS.singleton a]
+          | otherwise = init b ++ [BS.append (last b) (BS.singleton a)]
+
+trd :: (a, b, c) -> c
+trd (_, _, c) = c
