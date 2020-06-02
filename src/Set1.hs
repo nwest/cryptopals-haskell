@@ -2,52 +2,18 @@
 
 module Set1 where
 
+import Helpers
+import NWOpenSSL
+
 import Data.Word (Word8)
 import qualified Data.ByteString.Lazy        as BS
-import qualified Data.ByteString             as B
-import qualified Data.ByteString.Base16.Lazy as BS16
 import qualified Data.ByteString.Base64.Lazy as BS64
 import Data.ByteString.Internal (c2w, w2c)
 import Data.Bits (xor, popCount)
-import Data.Either (fromRight)
 import Data.List (foldl', sortOn)
 import qualified Data.Set as S
 import OpenSSL.EVP.Cipher
 import OpenSSL.EVP.Base64
-
-type ErrorString = BS.ByteString
-type HexString = BS.ByteString
-type Base64String = BS.ByteString
-
-hexToBase64 :: HexString -> Either (ErrorString) (Base64String)
-hexToBase64 a = BS64.encode <$> decodeHex a
-
-decodeHex :: HexString -> Either (ErrorString) BS.ByteString
-decodeHex a | (decoded, "") <- BS16.decode $ a = Right decoded
-            | otherwise = Left $ BS.concat ["invalid hex: ", a]
-
-rawString :: BS.ByteString -> String
-rawString = map w2c . BS.unpack
-
-xorBytes :: BS.ByteString -> BS.ByteString -> Either (ErrorString) BS.ByteString
-xorBytes a b | BS.length a == BS.length b = Right . BS.pack $ BS.zipWith xor a b
-             | otherwise = Left "Mismatched lengths for XOR"
-
-bytesToHex :: BS.ByteString -> HexString
-bytesToHex = BS16.encode
-
-
-hexToRaw :: HexString -> String
-hexToRaw = rawString . fromRight "" <$> decodeHex
-
-hexToBytes :: HexString -> BS.ByteString
-hexToBytes = fromRight BS.empty . decodeHex
-
-singleCharXOR :: Word8 -> BS.ByteString -> BS.ByteString
-singleCharXOR c xs = BS.pack . BS.zipWith xor cs $ xs
-                      where
-                        len = fromIntegral . BS.length $ xs
-                        cs = BS.pack . replicate len $ c
 
 singleChars :: [Word8]
 singleChars = [33..122] ++ [c2w ' ']
@@ -140,7 +106,7 @@ editScore bs@(b:_) = let len = length bs
 
 num6 :: IO BS.ByteString
 num6 = do
-       input <- BS64.decode . BS.filter (/= (c2w '\n')) <$> BS.readFile "./6.txt"
+       input <- BS64.decode . BS.filter (/= c2w '\n') <$> BS.readFile "./6.txt"
        let bs = case input of
                   Right bs' -> bs'
                   Left s -> BS.pack . map c2w $ s
@@ -155,12 +121,9 @@ ciphers :: IO [String]
 ciphers = getCipherNames
 
 num7 :: IO BS.ByteString
-num7 = do cip       <- getCipherByName $ "aes-128-ecb"
-          encrypted <- decodeBase64LBS . BS.filter (/= (c2w '\n')) <$> BS.readFile "./7.txt"
-          let key = B.pack . map c2w $ "YELLOW SUBMARINE"
-          case cip of
-              Just c -> (cipherLBS c key B.empty Decrypt encrypted)
-              Nothing ->  return BS.empty
+num7 = do encrypted <- decodeBase64LBS . BS.filter (/= c2w '\n') <$> BS.readFile "./7.txt"
+          let key = BS.pack . map c2w $ "YELLOW SUBMARINE"
+          aes128ecbDecrypt key encrypted
 
 num8 :: IO (S.Set BS.ByteString)
 num8 = do 

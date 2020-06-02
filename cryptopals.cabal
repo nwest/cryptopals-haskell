@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 2c8b2e3d8e125a7006704490b83cc484f4580bb8b841a9cdb0ab8ce1b2348298
+-- hash: 93a21eb8f06a472663dfa1169873ce87229ed8eb952e711571c270ef4cb7622b
 
 name:           cryptopals
 version:        0.1.0.0
@@ -27,7 +27,8 @@ source-repository head
 
 library
   exposed-modules:
-      Lib
+      Helpers
+      NWOpenSSL
       Set1
       Set2
   other-modules:

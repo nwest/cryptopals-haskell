@@ -2,10 +2,9 @@
 
 import qualified Test.Tasty
 import Test.Tasty.Hspec
+import Helpers
 import Set1
 import Control.Monad (join)
-import Data.ByteString.Internal (c2w)
-import qualified Data.ByteString.Lazy as BS
 
 main :: IO ()
 main = do
