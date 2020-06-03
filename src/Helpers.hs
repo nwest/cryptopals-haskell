@@ -9,6 +9,7 @@ import qualified Data.ByteString.Base64.Lazy as BS64
 import Data.ByteString.Internal (w2c)
 import Data.Bits (xor)
 import Data.Either (fromRight)
+import Debug.Trace
 
 type ErrorString = BS.ByteString
 type HexString = BS.ByteString
@@ -25,8 +26,12 @@ rawString :: BS.ByteString -> String
 rawString = map w2c . BS.unpack
 
 xorBytes :: BS.ByteString -> BS.ByteString -> Either ErrorString BS.ByteString
-xorBytes a b | BS.length a == BS.length b = Right . BS.pack $ BS.zipWith xor a b
-             | otherwise = Left "Mismatched lengths for XOR"
+xorBytes a b = if BS.length a == BS.length b
+                  then
+                    let xord = BS.pack . BS.zipWith xor a $ b
+                     in Right xord
+                  else
+                  Left "Mismatched lengths for XOR"
 
 bytesToHex :: BS.ByteString -> HexString
 bytesToHex = BS16.encode
