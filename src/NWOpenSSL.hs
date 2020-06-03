@@ -8,7 +8,9 @@ import qualified Data.ByteString.Lazy as BS
 import qualified Data.ByteString      as B
 import Data.Either (fromRight)
 import Data.List (foldl')
+import Data.Vector (toList)
 import OpenSSL.EVP.Cipher
+import System.Random.MWC
 
 pkcs7pad :: Int -> BS.ByteString -> BS.ByteString
 pkcs7pad len bytes = bytes `BS.append` paddingString
@@ -31,22 +33,16 @@ aes128ecbDecrypt key bytes = do cip <- getCipherByName "aes-128-ecb"
                                   Nothing -> return BS.empty
 
 
-aes128cbcDecrypt :: BS.ByteString -- IV
-                 -> BS.ByteString -- Key
-                 -> BS.ByteString -- Bytes
-                 -> IO BS.ByteString
+aes128cbcDecrypt :: BS.ByteString -> BS.ByteString -> BS.ByteString -> IO BS.ByteString
 aes128cbcDecrypt iv key bytes = do let chunked = takeChunks 16 bytes
-                                   foldl' i (return BS.empty) . fst . foldl' f ([], [iv]) $ chunked
+                                   BS.concat <$> (sequence . fst . foldl' f ([], [iv]) $ chunked)
   where
-    f (bs, as) a = let bs' = bs ++ [g (last as) a]
-                       as' = as ++ [a]
-                    in (bs', as')
+    f (bs, as) a = (bs ++ [g (last as) a], as ++ [a])
     g xs ys = do
       let decrypted = clean . BS.take 16 <$> aes128ecbDecrypt key (BS.append ys (BS.singleton 0))
       fromRight BS.empty . xorBytes xs <$> decrypted
     clean = BS.pack . BS.unpack
-    i d c = do
-      current <- d
-      next <- c
-      if BS.null current then c
-                         else return (BS.append current next)
+
+randomAESKey :: IO BS.ByteString
+randomAESKey = BS.pack . toList <$> (flip uniformVector 16 =<< createSystemRandom)
+

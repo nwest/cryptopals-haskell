@@ -34,6 +34,8 @@ library:
   - base64-bytestring
   - base16-bytestring
   - HsOpenSSL
+  - mwc-random
+  - vector
   source-dirs: src
 
 executables:
