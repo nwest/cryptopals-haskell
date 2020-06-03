@@ -58,3 +58,6 @@ takeChunks len = BS.foldl f []
 
 trd :: (a, b, c) -> c
 trd (_, _, c) = c
+
+clean :: BS.ByteString -> BS.ByteString
+clean = BS.pack . BS.unpack
