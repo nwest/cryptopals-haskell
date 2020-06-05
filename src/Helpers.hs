@@ -9,7 +9,6 @@ import qualified Data.ByteString.Base64.Lazy as BS64
 import Data.ByteString.Internal (w2c)
 import Data.Bits (xor)
 import Data.Either (fromRight)
-import Debug.Trace
 
 type ErrorString = BS.ByteString
 type HexString = BS.ByteString
