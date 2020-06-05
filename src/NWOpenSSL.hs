@@ -70,8 +70,8 @@ encryptionOracle bs = do
   input <- randomPad bs
   num <- uniformR (0 :: Int, 1) =<< createSystemRandom
   case num of
-    0 -> trace ("ecb") ecb input
-    1 -> trace ("cbc") cbc input
+    0 -> trace "ecb" ecb input
+    1 -> trace "cbc" cbc input
     _ -> return "derp"
   where
     ecb xs = flip aes128ecbEncrypt xs =<< randomAESKey
