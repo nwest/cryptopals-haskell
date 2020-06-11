@@ -80,3 +80,6 @@ encryptionOracle bs = do
       key <- randomAESKey
       aes128cbcEncrypt iv key xs
   
+ecbEncryptionOracle :: BS.ByteString -> BS.ByteString -> IO BS.ByteString
+ecbEncryptionOracle key bs = aes128ecbEncrypt key =<< randomPad bs
+
