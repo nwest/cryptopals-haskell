@@ -2,84 +2,73 @@
 
 module NWOpenSSL where
 
-import Helpers
+import           Helpers
+import           Codec.Crypto.SimpleAES (Key, Direction(..), Mode(..), crypt, randomKey)
+import qualified Data.ByteString.Lazy as Lazy (fromStrict, toStrict)
+import qualified Data.ByteString as ByteString (append, length, concat, pack)
+import           Data.ByteString.Char8 (ByteString)
+import qualified Data.ByteString.Char8 as Char8 (replicate, pack)
+import           Data.Char (chr)
+import           Data.List (foldl')
+import           Data.Vector (toList)
+import           System.Random.MWC
+import           Debug.Trace
 
-import qualified Data.ByteString.Lazy as BS
-import qualified Data.ByteString      as B
-import Data.Either (fromRight)
-import Data.List (foldl')
-import Data.Vector (toList)
-import OpenSSL.EVP.Cipher
-import System.Random.MWC
-import Debug.Trace
+type IV = ByteString
 
-pkcs7pad :: Int -> BS.ByteString -> BS.ByteString
-pkcs7pad len bytes = bytes `BS.append` paddingString
+pkcs7pad :: Int -> ByteString -> ByteString
+pkcs7pad size bytes | byte > 0 = ByteString.append bytes paddingString
+                    | otherwise = bytes
   where
-    paddingString = BS.replicate (fromIntegral paddingByte) (fromIntegral paddingByte)
-    paddingByte   = fromIntegral len - (BS.length bytes `mod` fromIntegral len)
+    byte = size - ByteString.length bytes
+    paddingString = Char8.pack . replicate byte $ chr byte
 
-aes128ecbEncrypt :: BS.ByteString -> BS.ByteString -> IO BS.ByteString
-aes128ecbEncrypt key bytes = do cip <- getCipherByName "aes-128-ecb"
-                                let strictKey = BS.toStrict key
-                                case cip of
-                                  Just c -> cipherLBS c strictKey B.empty Encrypt bytes
-                                  Nothing ->  return BS.empty
+zeroIV :: ByteString
+zeroIV = Char8.replicate 16 '\0'
 
-aes128ecbDecrypt :: BS.ByteString -> BS.ByteString -> IO BS.ByteString
-aes128ecbDecrypt key bytes = do cip <- getCipherByName "aes-128-ecb"
-                                let strictKey = BS.toStrict key
-                                case cip of
-                                  Just c -> cipherLBS c strictKey B.empty Decrypt bytes
-                                  Nothing -> return BS.empty
+encryptECB :: Key -> ByteString -> ByteString
+encryptECB key = Lazy.toStrict . crypt ECB key zeroIV Encrypt . Lazy.fromStrict
 
+decryptECB :: Key -> ByteString -> ByteString
+decryptECB key = Lazy.toStrict . crypt ECB key zeroIV Decrypt . Lazy.fromStrict
 
-aes128cbcEncrypt :: BS.ByteString -> BS.ByteString -> BS.ByteString -> IO BS.ByteString
-aes128cbcEncrypt iv key bytes = BS.concat <$> (sequence . tail . foldl' f [return iv] $ takeChunks 16 bytes)
+encryptCBC :: IV -> Key -> ByteString -> ByteString
+encryptCBC iv key = ByteString.concat . foldl' f [] . takeChunks 16
   where
-    f bs a = bs ++ [g a =<< last bs]
-    g xs ys = BS.take 16 <$> (aes128ecbEncrypt key . fromRight BS.empty . xorBytes xs $ ys)
+    f bs b = bs ++ [encryptECB key . xorBytes b $ lastOr iv bs]
 
-aes128cbcDecrypt :: BS.ByteString -> BS.ByteString -> BS.ByteString -> IO BS.ByteString
-aes128cbcDecrypt iv key bytes = BS.concat <$> (sequence . fst . foldl' f ([], [iv]) $ takeChunks 16 bytes)
-  where
-    f (bs, as) a = (bs ++ [g (last as) a], as ++ [a])
-    g xs ys = do
-      let decrypted = clean . BS.take 16 <$> aes128ecbDecrypt key (BS.append ys (BS.singleton 0))
-      fromRight BS.empty . xorBytes xs <$> decrypted
+decryptCBC :: IV -> Key -> ByteString -> ByteString
+decryptCBC iv key = ByteString.concat . fst . foldl' f ([], []) . takeChunks 16
+   where
+     f (bs, as) a = (bs ++ [xorBytes (lastOr iv as) . decryptECB key $ a], as ++ [a])
 
-randomAESKey :: IO BS.ByteString
-randomAESKey = randomBytes 16
+lastOr :: a -> [a] -> a
+lastOr a [] = a
+lastOr _ as = last as
 
-randomBytes :: Int -> IO BS.ByteString
-randomBytes n = BS.pack . toList <$> (flip uniformVector n =<< createSystemRandom)
-
-randomPad :: BS.ByteString -> IO BS.ByteString
+randomBytes :: Int -> IO ByteString
+randomBytes n = ByteString.pack . toList <$> (flip uniformVector n =<< createSystemRandom)
+ 
+randomPad :: ByteString -> IO ByteString
 randomPad bs = do
   gen <- createSystemRandom
   num <- randomBytes <$> uniformR (5, 10) gen
   before <- num
   after <- num
-  let bs' = BS.append (BS.append before bs) after
+  let bs' = ByteString.append (ByteString.append before bs) after
   let chunks = takeChunks 16 bs'
       pChunks = init chunks ++ [pkcs7pad 16 (last chunks)]
-  return . BS.concat $ pChunks
+  return . ByteString.concat $ pChunks
 
-encryptionOracle :: BS.ByteString -> IO BS.ByteString
-encryptionOracle bs = do
-  input <- randomPad bs
-  num <- uniformR (0 :: Int, 1) =<< createSystemRandom
-  case num of
-    0 -> trace "ecb" ecb input
-    1 -> trace "cbc" cbc input
-    _ -> return "derp"
+encryptionOracle :: ByteString -> IO ByteString
+encryptionOracle bs = do 
+  useECB <- uniformR (True, False) =<< createSystemRandom
+  randomPad bs >>= if useECB then trace "ecb" ecb 
+                             else trace "cbc" cbc
   where
-    ecb xs = flip aes128ecbEncrypt xs =<< randomAESKey
-    cbc xs = do
-      iv <- randomAESKey
-      key <- randomAESKey
-      aes128cbcEncrypt iv key xs
-  
-ecbEncryptionOracle :: BS.ByteString -> BS.ByteString -> IO BS.ByteString
-ecbEncryptionOracle key bs = aes128ecbEncrypt key =<< randomPad bs
+    ecb xs = flip encryptECB xs <$> randomKey
+    cbc xs = flip (uncurry encryptCBC) xs <$> ((,) <$> randomKey <*> randomKey)
+   
+ecbEncryptionOracle :: ByteString -> ByteString -> IO ByteString
+ecbEncryptionOracle key bs = encryptECB key <$> randomPad bs
 

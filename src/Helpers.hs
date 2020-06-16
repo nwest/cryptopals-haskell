@@ -2,61 +2,54 @@
 
 module Helpers where
 
-import Data.Word (Word8)
-import qualified Data.ByteString.Lazy        as BS
-import qualified Data.ByteString.Base16.Lazy as BS16
-import qualified Data.ByteString.Base64.Lazy as BS64
-import Data.ByteString.Internal (w2c)
-import Data.Bits (xor)
-import Data.Either (fromRight)
+import           Data.Word (Word8)
 
-type ErrorString = BS.ByteString
-type HexString = BS.ByteString
-type Base64String = BS.ByteString
+import qualified Data.ByteString as ByteString (foldl', length, singleton, append, zipWith, pack, concat)
+import           Data.ByteString.Char8 (ByteString)
+import qualified Data.ByteString.Char8 as Char8 (unpack)
 
-hexToBase64 :: HexString -> Either ErrorString Base64String
-hexToBase64 a = BS64.encode <$> decodeHex a
+import qualified Data.ByteString.Base16 as BS16
+import qualified Data.ByteString.Base64 as BS64
+import           Data.Bits (xor)
 
-decodeHex :: HexString -> Either ErrorString BS.ByteString
-decodeHex a | (decoded, "") <- BS16.decode a = Right decoded
-            | otherwise = Left $ BS.concat ["invalid hex: ", a]
+type HexString = ByteString
+type Base64String = ByteString
 
-rawString :: BS.ByteString -> String
-rawString = map w2c . BS.unpack
+hexToBase64 :: HexString -> Base64String
+hexToBase64 = BS64.encode . decodeHex
 
-xorBytes :: BS.ByteString -> BS.ByteString -> Either ErrorString BS.ByteString
-xorBytes a b = if BS.length a == BS.length b
-                  then
-                    let xord = BS.pack . BS.zipWith xor a $ b
-                     in Right xord
-                  else
-                  Left "Mismatched lengths for XOR"
+decodeHex :: HexString -> ByteString
+decodeHex a | (decoded, "") <- BS16.decode a = decoded
+            | otherwise = ByteString.concat ["invalid hex: ", a]
 
-bytesToHex :: BS.ByteString -> HexString
+rawString :: ByteString -> String
+rawString = Char8.unpack
+
+xorBytes :: ByteString -> ByteString -> ByteString
+xorBytes a = ByteString.pack . ByteString.zipWith xor a
+
+bytesToHex :: ByteString -> HexString
 bytesToHex = BS16.encode
 
 
 hexToRaw :: HexString -> String
-hexToRaw = rawString . fromRight "" <$> decodeHex
+hexToRaw = rawString . decodeHex
 
-hexToBytes :: HexString -> BS.ByteString
-hexToBytes = fromRight BS.empty . decodeHex
+hexToBytes :: HexString -> ByteString
+hexToBytes = decodeHex
 
-singleCharXOR :: Word8 -> BS.ByteString -> BS.ByteString
-singleCharXOR c xs = BS.pack . BS.zipWith xor cs $ xs
+singleCharXOR :: Word8 -> ByteString -> ByteString
+singleCharXOR c xs = ByteString.pack . ByteString.zipWith xor cs $ xs
                       where
-                        len = fromIntegral . BS.length $ xs
-                        cs = BS.pack . replicate len $ c
+                        len = fromIntegral . ByteString.length $ xs
+                        cs = ByteString.pack . replicate len $ c
 
-takeChunks :: Int -> BS.ByteString -> [BS.ByteString]
-takeChunks len = BS.foldl f []
+takeChunks :: Int -> ByteString -> [ByteString]
+takeChunks len = ByteString.foldl' f []
   where
-    f b a | null b = [BS.singleton a]
-          | BS.length (last b) == fromIntegral len = b ++ [BS.singleton a]
-          | otherwise = init b ++ [BS.append (last b) (BS.singleton a)]
+    f b a | null b = [ByteString.singleton a]
+          | ByteString.length (last b) == fromIntegral len = b ++ [ByteString.singleton a]
+          | otherwise = init b ++ [ByteString.append (last b) (ByteString.singleton a)]
 
 trd :: (a, b, c) -> c
 trd (_, _, c) = c
-
-clean :: BS.ByteString -> BS.ByteString
-clean = BS.pack . BS.unpack
