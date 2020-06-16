@@ -1,16 +1,14 @@
-{-# LANGUAGE OverloadedStrings #-}
 
 module Helpers where
 
-import           Data.Word (Word8)
-
-import qualified Data.ByteString as ByteString (foldl', length, singleton, append, zipWith, pack, concat)
+import           Data.Bits (xor)
+import qualified Data.ByteString as ByteString (zipWith, pack, null, splitAt)
 import           Data.ByteString.Char8 (ByteString)
-import qualified Data.ByteString.Char8 as Char8 (unpack)
+import qualified Data.ByteString.Char8 as Char8 (unpack, replicate, length)
 
 import qualified Data.ByteString.Base16 as BS16
 import qualified Data.ByteString.Base64 as BS64
-import           Data.Bits (xor)
+import Data.List (unfoldr)
 
 type HexString = ByteString
 type Base64String = ByteString
@@ -19,11 +17,7 @@ hexToBase64 :: HexString -> Base64String
 hexToBase64 = BS64.encode . decodeHex
 
 decodeHex :: HexString -> ByteString
-decodeHex a | (decoded, "") <- BS16.decode a = decoded
-            | otherwise = ByteString.concat ["invalid hex: ", a]
-
-rawString :: ByteString -> String
-rawString = Char8.unpack
+decodeHex = fst . BS16.decode
 
 xorBytes :: ByteString -> ByteString -> ByteString
 xorBytes a = ByteString.pack . ByteString.zipWith xor a
@@ -31,25 +25,26 @@ xorBytes a = ByteString.pack . ByteString.zipWith xor a
 bytesToHex :: ByteString -> HexString
 bytesToHex = BS16.encode
 
-
 hexToRaw :: HexString -> String
-hexToRaw = rawString . decodeHex
+hexToRaw = Char8.unpack . decodeHex
 
 hexToBytes :: HexString -> ByteString
 hexToBytes = decodeHex
 
-singleCharXOR :: Word8 -> ByteString -> ByteString
-singleCharXOR c xs = ByteString.pack . ByteString.zipWith xor cs $ xs
-                      where
-                        len = fromIntegral . ByteString.length $ xs
-                        cs = ByteString.pack . replicate len $ c
+singleCharXOR :: Char -> ByteString -> ByteString
+singleCharXOR c xs = ByteString.pack . ByteString.zipWith xor xs . Char8.replicate (Char8.length xs) $ c
 
 takeChunks :: Int -> ByteString -> [ByteString]
-takeChunks len = ByteString.foldl' f []
-  where
-    f b a | null b = [ByteString.singleton a]
-          | ByteString.length (last b) == fromIntegral len = b ++ [ByteString.singleton a]
-          | otherwise = init b ++ [ByteString.append (last b) (ByteString.singleton a)]
+takeChunks size = unfoldr (\bytes -> let (chunk, rest) = ByteString.splitAt size bytes
+                                      in if ByteString.null chunk then Nothing
+                                                                  else Just (chunk, rest))
+
+fst3 :: (a, b, c) -> a
+fst3 (a, _, _) = a
+
+snd3 :: (a, b, c) -> b
+snd3 (_, b, _) = b
 
 trd :: (a, b, c) -> c
 trd (_, _, c) = c
+

@@ -11,15 +11,13 @@ import           Data.ByteString.Char8 (ByteString)
 import qualified Data.ByteString.Char8  as Char8 (unpack, pack, split, filter)
 import qualified Data.ByteString.Base64 as BS64
 
+import Data.Char (chr)
+
 import Data.List (foldl', sortOn)
 import qualified Data.Set as S
-import Data.Word (Word8)
 
-singleChars :: [Word8]
-singleChars = [32..122]
-
-singleCharsNice :: ByteString
-singleCharsNice = ByteString.pack singleChars
+singleChars :: String
+singleChars = map chr [32..122]
 
 charEnglishScore :: Char -> Int
 charEnglishScore 'e' = 2200
@@ -44,7 +42,7 @@ input3 = hexToBytes "1b37373331363f78151b7f2b783431333d78397828372d363c78373e783
 num3 :: ByteString
 num3 = trd . bestSingleCharXOR $ input3
 
-bestSingleCharXOR :: ByteString -> (Word8, Int, ByteString)
+bestSingleCharXOR :: ByteString -> (Char, Int, ByteString)
 bestSingleCharXOR xs = let scores = map f singleChars
                         in last . sortOn (\(_, a, _) -> a) $ scores
                        where f c = let xord = singleCharXOR c xs
