@@ -4,7 +4,7 @@ cabal-version: 1.12
 --
 -- see: https://github.com/sol/hpack
 --
--- hash: 5f0d21e099d65b2dc7c55802c98d433e9ff20a8569479c65a19e073bc71cd3ae
+-- hash: ce8e9d65e02a2ed8278f6d4e8002d4907f278a3eb0d8d35a00c8ab537843ed43
 
 name:           cryptopals
 version:        0.1.0.0
@@ -45,6 +45,7 @@ library
     , bytestring
     , containers
     , mwc-random
+    , unordered-containers
     , vector
   default-language: Haskell2010
 

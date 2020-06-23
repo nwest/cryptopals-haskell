@@ -30,6 +30,7 @@ library:
   dependencies:
   - base
   - containers
+  - unordered-containers
   - bytestring
   - base64-bytestring
   - base16-bytestring
