@@ -56,7 +56,12 @@ lastOr _ as = last as
 
 randomBytes :: Int -> IO ByteString
 randomBytes n = ByteString.pack . toList <$> (flip uniformVector n =<< createSystemRandom)
- 
+
+randomPre :: IO ByteString
+randomPre = do
+  num <- uniformR (5, 10) =<< createSystemRandom
+  randomBytes num
+
 randomPad :: ByteString -> IO ByteString
 randomPad bs = do
   gen <- createSystemRandom
@@ -87,22 +92,30 @@ isECB :: Encryptor -> Int -> Bool
 isECB enc size = let (a:b:_) = takeChunks size . enc . Char8.replicate (size * 2) $ '\0'
                   in a == b
 
+ecbPrefixLength :: Encryptor -> Int -> Int
+ecbPrefixLength enc blockSize = 
+  let Just zeroBuffer = findIndex (uncurry (==)) $ zip spacers (tail spacers)
+   in blockSize - zeroBuffer - 1
+  where
+    spacers = map (ByteString.take blockSize . enc . flip Char8.replicate '\0') [1..]
+
 ecbPlaintextLength :: Encryptor -> Int
 ecbPlaintextLength enc = let steps = map (ByteString.length . enc . flip Char8.replicate '\0') [0..]
                              Just paddingSize = findIndex (/= 0) . zipWith (-) (tail steps) $ steps
                           in head steps - paddingSize
 
 breakECB :: Encryptor -> Int -> ByteString
-breakECB enc blockSize = foldl' (\bs i -> 
-  Char8.snoc bs (breakECBByte blockSize enc i bs)) 
-  "" 
-  [1..ecbPlaintextLength enc]
+breakECB enc blockSize = let padLength = blockSize - ecbPrefixLength enc blockSize
+                          in foldl' (\bs i -> 
+                              Char8.snoc bs (breakECBByte blockSize padLength enc i bs)) 
+                              "" 
+                              [1..ecbPlaintextLength enc]
 
-breakECBByte :: Int -> Encryptor -> Int -> ByteString -> Char
-breakECBByte size encryptor index bs = 
-    let prefixLength = size - (index - 1) `mod` size - 1
+breakECBByte :: Int -> Int -> Encryptor -> Int -> ByteString -> Char
+breakECBByte blockSize padLength encryptor index bs = 
+    let prefixLength = padLength + blockSize - (index - 1) `mod` blockSize - 1
         zeros = Char8.replicate prefixLength '\0'
-        targetSize = (1 + (index - 1) `quot` size) * size
+        targetSize = padLength + ((1 + (index - 1) `quot` blockSize) * blockSize)
         target = ByteString.take targetSize $ encryptor zeros
         prefix = ByteString.append zeros bs
         dict = foldr
