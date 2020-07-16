@@ -7,8 +7,8 @@ import           Codec.Crypto.SimpleAES (Key, Direction(..), Mode(..), crypt, ra
 import qualified Data.ByteString.Lazy as Lazy (fromStrict, toStrict)
 import qualified Data.ByteString as ByteString (append, length, concat, pack, take)
 import           Data.ByteString.Char8 (ByteString)
-import qualified Data.ByteString.Char8 as Char8 (replicate, pack, snoc)
-import           Data.Char (chr)
+import qualified Data.ByteString.Char8 as Char8 (replicate, pack, snoc, last, length, drop, take, unpack)
+import           Data.Char (chr, ord)
 import           Data.List (foldl', findIndex)
 import           Data.Vector (toList)
 import qualified Data.HashMap.Strict as HashMap (empty, insert, lookup)
@@ -27,6 +27,16 @@ pkcs7pad size bytes | byte > 0 = ByteString.append bytes paddingString
   where
     byte = size - ByteString.length bytes
     paddingString = Char8.pack . replicate byte $ chr byte
+
+pkcs7unpad :: Int -> ByteString -> (Bool, ByteString)
+pkcs7unpad size bytes = let end = ord . Char8.last $ bytes
+                         in if end < size then unpad end bytes 
+                                          else (False, "")
+  where 
+    unpad n bs = let contentLength = Char8.length bs - n
+                     pad = Char8.drop contentLength bs
+                     valid = all (== chr n) . Char8.unpack $ pad
+                  in if valid then (True, Char8.take contentLength bs) else (False, "")
 
 zeroIV :: ByteString
 zeroIV = Char8.replicate 16 '\0'
