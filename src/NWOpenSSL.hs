@@ -28,15 +28,16 @@ pkcs7pad size bytes | byte > 0 = ByteString.append bytes paddingString
     byte = size - ByteString.length bytes
     paddingString = Char8.pack . replicate byte $ chr byte
 
-pkcs7unpad :: Int -> ByteString -> (Bool, ByteString)
+pkcs7unpad :: Int -> ByteString -> ByteString
 pkcs7unpad size bytes = let end = ord . Char8.last $ bytes
                          in if end < size then unpad end bytes 
-                                          else (False, "")
+                                          else err bytes
   where 
+    err bs = error ("Bad Padding: " ++ Char8.unpack bs)
     unpad n bs = let contentLength = Char8.length bs - n
                      pad = Char8.drop contentLength bs
                      valid = all (== chr n) . Char8.unpack $ pad
-                  in if valid then (True, Char8.take contentLength bs) else (False, "")
+                  in if valid then Char8.take contentLength bs else err bs
 
 zeroIV :: ByteString
 zeroIV = Char8.replicate 16 '\0'
