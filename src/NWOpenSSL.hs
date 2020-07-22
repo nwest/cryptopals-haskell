@@ -22,10 +22,12 @@ type IV = ByteString
 type Encryptor = ByteString -> ByteString
 
 pkcs7pad :: Int -> ByteString -> ByteString
-pkcs7pad size bytes | byte > 0 = ByteString.append bytes paddingString
+pkcs7pad size bytes | remainder == 0 = bytes
+                    | byte > 0 = ByteString.append bytes paddingString
                     | otherwise = bytes
   where
-    byte = size - ByteString.length bytes
+    remainder = ByteString.length bytes `mod` size
+    byte = size - remainder
     paddingString = Char8.pack . replicate byte $ chr byte
 
 pkcs7unpad :: Int -> ByteString -> ByteString

@@ -2,14 +2,14 @@
 
 module Set2 where
 
-import           Data.Char (isDigit, isLetter)
+import           Data.Char (isDigit, isLetter, ord, chr)
 import           Codec.Crypto.SimpleAES (Key)
 import qualified Data.ByteString.Lazy as Lazy (cycle, take, toStrict)
 import qualified Data.ByteString as ByteString (drop, readFile, append, take, length)
 import           Data.ByteString.Char8 (ByteString)
-import qualified Data.ByteString.Char8 as Char8 (pack, filter, unpack)
+import qualified Data.ByteString.Char8 as Char8 (pack, filter, unpack, split, concat, null, breakSubstring)
 import qualified Data.ByteString.Base64 as Base64 (decodeLenient)
-import           Data.List (find)
+import           Data.List (find, intersperse)
 import qualified Data.Map.Strict as M (fromList, Map, lookup)
 import           Text.ParserCombinators.ReadP
 import qualified Data.Set as S
@@ -36,7 +36,7 @@ num11 = do
 
 
 num12Bytes :: ByteString
-num12Bytes = Base64.decodeLenient "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBoaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK"
+num12Bytes = Base64.decodeLenient "Um9sbGluJyBpbiBteSA1LjAKV2l0aCBteSByYWctdG9wIGRvd24gc28gbXkgaGFpciBjYW4gYmxvdwpUaGUgZ2lybGllcyBvbiBzdGFuZGJ5IHdhdmluZyBqdXN0IHRvIHNheSBodyld: Library not loaded: /usr/local/opt/perl/lib/perl5/5.30.2/darwin-thread-multi-2level/CORE/libperl.dylibaQpEaWQgeW91IHN0b3A/IE5vLCBJIGp1c3QgZHJvdmUgYnkK"
 
 num12Encryptor :: Key -> Encryptor
 num12Encryptor key bs = encryptECB key $ ByteString.append bs num12Bytes
@@ -115,5 +115,42 @@ num14 = do
       keySize = ecbKeySize encryptor
   print $ breakECB encryptor keySize
 
+num16InputWrap :: ByteString -> ByteString
+num16InputWrap bs = let clean = cleansed bs
+                        surrounded = ByteString.append "comment1=cooking%20MCs;userdata=" 
+                                      (ByteString.append clean ";comment2=%20like%20a%20pound%20of%20bacon")
+                        padded = pkcs7pad 16 surrounded
+                     in padded
+                          where
+                            cleansed = swap ';' "';'" . swap '=' "'='"
+                            swap x xs = Char8.concat . intersperse xs . Char8.split x
 
+num16Encryptor :: Key -> IV -> Encryptor
+num16Encryptor key iv = encryptCBC key iv . num16InputWrap
+
+num16Decrypt :: Key -> IV -> ByteString -> Bool
+num16Decrypt key iv bs = let ds = decryptCBC key iv bs
+                          in (not (Char8.null ds) &&
+                              case Char8.breakSubstring ";admin=true" ds of
+                                (_,y) | Char8.null y -> False
+                                      | otherwise    -> True)
+
+num16 :: IO ()
+num16 = do
+  key <- randomAESKey
+  iv <- randomAESKey
+  let enc = num16Encryptor key iv
+      dec = decryptCBC key iv
+      input = " admin true"
+      cipherTexts = takeChunks 16 . enc $ input
+      original = map ord . Char8.unpack . (!! 1) $ cipherTexts
+      admin = take 5 . drop 1 $ original
+      rest = drop 7 original
+      trys = [ (x, y) | x <- [0..255], y <- [0..255] ]
+      bruteBlocks = map (\x -> buildBlock x admin rest) trys
+      editedCiphertexts = map (\bs -> Char8.concat $ head cipherTexts : bs : drop 2 cipherTexts) bruteBlocks
+      swapBytes = head . filter (num16Decrypt key iv) $ editedCiphertexts
+  print $ dec swapBytes
+    where 
+      buildBlock (a, b) admin rest = Char8.pack . map chr $ (a : admin) ++ (b : rest)
 
